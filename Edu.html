@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduPlay Pro Mini</title>
+<style>
+body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f0f8ff; text-align:center; }
+header { background:#4CAF50; color:white; padding:20px; font-size:1.5em; }
+section { padding:20px; }
+.points { font-size:1.2em; margin:10px; }
+.hidden { display:none; }
+#options { display:flex; flex-wrap: wrap; justify-content:center; margin-top:20px; }
+.card { background:#fff; border-radius:15px; padding:20px 30px; margin:10px; font-size:1.2em; cursor:pointer; box-shadow:0 4px 8px rgba(0,0,0,0.2); transition: transform 0.3s, background 0.3s; width:150px; text-align:center; }
+.card:hover { transform: scale(1.05); background:#e0f7fa; }
+.math { background:#ff9999; color:white; }
+.ortho { background:#66ccff; color:white; }
+.memory { background:#ffcc66; color:white; }
+.funfact { background:#ff99ff; color:white; }
+#confettiCanvas { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:9999; }
+.levelSelect { margin:20px; }
+.levelSelect button { padding:10px 20px; margin:5px; border-radius:10px; border:none; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<canvas id="confettiCanvas"></canvas>
+
+<header>🎓 EduPlay Pro Mini</header>
+
+<section id="menu">
+    <div class="points">Punkty: <span id="points">0</span> ⭐</div>
+    <div id="menuButtons">
+        <div class="card math" onclick="selectLevel('math')">Matematyka</div>
+        <div class="card ortho" onclick="selectLevel('ortho')">Ortografia</div>
+        <div class="card memory" onclick="selectLevel('memory')">Pamięć</div>
+        <div class="card funfact" onclick="showFunFact()">Ciekawostki</div>
+    </div>
+</section>
+
+<section id="level" class="hidden">
+    <div id="levelQuestion"></div>
+    <div id="levelOptions"></div>
+    <div><div class="card" onclick="backToMenu()">🏠 Powrót do Menu</div></div>
+</section>
+
+<section id="game" class="hidden">
+    <div id="question"></div>
+    <div id="options"></div>
+    <div><div class="card" onclick="backToMenu()">🏠 Powrót do Menu</div></div>
+</section>
+
+<script>
+// ================= Punkty =================
+let points = parseInt(localStorage.getItem('eduPoints')) || 0;
+document.getElementById('points').textContent = points;
+function savePoints(){ localStorage.setItem('eduPoints',points); document.getElementById('points').textContent=points; }
+function backToMenu(){ document.getElementById('game').classList.add('hidden'); document.getElementById('level').classList.add('hidden'); document.getElementById('menu').classList.remove('hidden'); }
+
+// ================= Konfetti =================
+const canvas=document.getElementById('confettiCanvas');
+const ctx=canvas.getContext('2d');
+canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+let confetti=[];
+function showConfetti(){
+    confetti=[];
+    for(let i=0;i<100;i++){ confetti.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height- canvas.height,r:Math.random()*6+4,d:Math.random()*100,color:`hsl(${Math.random()*360},100%,50%)`,tilt:Math.random()*10-5});}
+    requestAnimationFrame(updateConfetti);
+}
+function updateConfetti(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    confetti.forEach(p=>{
+        ctx.fillStyle=p.color; ctx.beginPath();
+        ctx.moveTo(p.x+p.tilt,p.y); ctx.lineTo(p.x+p.tilt+p.r/2,p.y+p.r); ctx.lineTo(p.x+p.tilt-p.r/2,p.y+p.r); ctx.closePath(); ctx.fill();
+        p.y+=2+Math.random()*2; p.x+=Math.sin(p.y/10);
+        if(p.y>canvas.height) p.y=-10;
+    });
+    if(confetti.length>0) requestAnimationFrame(updateConfetti);
+}
+
+// ================= Poziomy =================
+function selectLevel(game){
+    document.getElementById('menu').classList.add('hidden');
+    document.getElementById('level').classList.remove('hidden');
+    let text='Wybierz poziom:';
+    let buttons='';
+    if(game==='math'||game==='ortho'||game==='memory'){
+        [1,2,3].forEach(l=> buttons+=`<button onclick="startGame('${game}',${l})">${l}</button>`);
+    }
+    document.getElementById('levelQuestion').innerText=text;
+    document.getElementById('levelOptions').innerHTML=buttons;
+}
+
+// ================= Gry =================
+let currentAnswer=0;
+let currentGame='';
+function startGame(game,level){
+    currentGame=game;
+    document.getElementById('level').classList.add('hidden'); document.getElementById('game').classList.remove('hidden');
+    if(game==='math'){ showMath(level); }
+    if(game==='ortho'){ showOrtho(level); }
+    if(game==='memory'){ showMemory(level); }
+}
+
+// ===== Matematyka =====
+function showMath(level){
+    let ops = level===1?['+','-']:level===2?['+','-','×']:['+','-','×','÷'];
+    let op=ops[Math.floor(Math.random()*ops.length)];
+    let a=Math.floor(Math.random()*(level*10+10))+1;
+    let b=Math.floor(Math.random()*(level*10+10))+1;
+    if(op==='-'){ if(a<b)[a,b]=[b,a]; currentAnswer=a-b; }
+    else if(op==='×'){ currentAnswer=a*b; }
+    else if(op==='÷'){ b=Math.floor(Math.random()*9)+1; a=b*(Math.floor(Math.random()*9)+1); currentAnswer=a/b; }
+    else{ currentAnswer=a+b; }
+    document.getElementById('question').innerText=`🎯 Ile to jest: ${a} ${op} ${b}?`;
+    let ans=[currentAnswer,currentAnswer+1,currentAnswer-1,currentAnswer+2].sort(()=>Math.random()-0.5);
+    document.getElementById('options').innerHTML=ans.map(n=>`<div class="card" onclick="checkAnswer(${n},${level})">${n}</div>`).join('');
+}
+
+// ===== Ortografia =====
+const orthoEasy=[{word:'K_T',options:['A','O','U'],answer:'A'},{word:'P_SMA',options:['I','A','E'],answer:'I'},{word:'S_ŁOŃ',options:['A','E','O'],answer:'O'}];
+const orthoHard=[{word:'R_KA',options:['O','A','U'],answer:'O'},{word:'B_DŹ',options:['O','A','U'],answer:'A'},{word:'Ś_WIAT',options:['O','A','I'],answer:'I'},{word:'M_LOŚĆ',options:['A','I','O'],answer:'I'},{word:'G_WNIA',options:['O','A','E'],answer:'A'}];
+function showOrtho(level){
+    let words=level===1?orthoEasy:orthoHard;
+    let q=words[Math.floor(Math.random()*words.length)];
+    currentAnswer=q.answer;
+    document.getElementById('question').innerText=`✏️ Uzupełnij literę: ${q.word}`;
+    document.getElementById('options').innerHTML=q.options.map(o=>`<div class="card" onclick="checkAnswer('${o}',${level})">${o}</div>`).join('');
+}
+
+// ===== Pamięć =====
+function showMemory(level){
+    let length=level===1?5:level===2?7:10;
+    let nums=Array.from({length},()=>Math.floor(Math.random()*20)+1);
+    currentAnswer=nums.join(' ');
+    document.getElementById('question').innerText=`🃏 Zapamiętaj liczby: ${nums.join(' ')} (5 sek)`;
+    document.getElementById('options').innerHTML='';
+    setTimeout(()=>{
+        let ans=prompt('Podaj liczby w tej samej kolejności, oddzielone spacją:');
+        if(ans===currentAnswer){ points++; savePoints(); showConfetti(); alert('Brawo! ✅'); if(points%10===0) alert('🎉 Otrzymujesz odznakę edukacyjną!'); }
+        else alert('Nie tym razem ❌');
+        backToMenu();
+    },5000);
+}
+
+// ===== Sprawdzanie odpowiedzi =====
+function checkAnswer(selected,level){
+    if(currentGame==='memory') return;
+    if(selected==currentAnswer){ points++; savePoints(); showConfetti(); alert('Brawo! ✅'); if(points%10===0) alert('🎉 Otrzymujesz odznakę edukacyjną!'); }
+    else alert('Spróbuj jeszcze raz! ❌');
+    if(currentGame==='math') showMath(level);
+    if(currentGame==='ortho') showOrtho(level);
+}
+
+// ===== Ciekawostki =====
+const funFacts=[
+    "Czy wiesz, że serce człowieka bije około 100 000 razy dziennie?",
+    "Czy wiesz, że ośmiornice mają trzy serca?",
+    "Czy wiesz, że banany są jagodami, a truskawki nie?",
+    "Czy wiesz, że woda w stanie stałym (lód) jest lżejsza niż woda w stanie ciekłym?",
+    "Czy wiesz, że mrówki nie mają płuc?",
+    "Czy wiesz, że wulkany na Marsie są większe niż na Ziemi?",
+    "Czy wiesz, że koty nie odczuwają słodkiego smaku?",
+    "Czy wiesz, że pingwiny potrafią nurkować do 500 metrów?"
+];
+function showFunFact(){
+    document.getElementById('menu').classList.add('hidden');
+    document.getElementById('game').classList.remove('hidden');
+    document.getElementById('question').innerText=funFacts[Math.floor(Math.random()*funFacts.length)];
+    document.getElementById('options').innerHTML='';
+}
+</script>
+
+</body>
+</html>
